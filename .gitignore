@@ -1,0 +1,5 @@
+build/
+.bob/
+.vscode
+__pycache__
+artifact.properties

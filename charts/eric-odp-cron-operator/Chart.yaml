@@ -1,0 +1,6 @@
+apiVersion: v2
+name: eric-odp-cron-operator
+description: A Helm chart for On demand Cron Operator
+type: application
+version: 1.0.0
+appVersion: "0.1.0"

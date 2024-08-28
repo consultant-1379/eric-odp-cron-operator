@@ -1,0 +1,179 @@
+{{- $g := fromJson (include "eric-odp-cron-operator.global" .) -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eric-odp-cron-operator.name" . }}
+  labels:
+{{- include "eric-odp-cron-operator.labels" . | indent 4 }}
+  annotations:
+{{- include "eric-odp-cron-operator.annotations-with-prometheus" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "eric-odp-cron-operator.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  strategy:
+    type: {{ .Values.updateStrategy.type }}
+    {{- if and (eq .Values.updateStrategy.type "RollingUpdate") .Values.updateStrategy.rollingUpdate }}
+    rollingUpdate:
+{{- if .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+      maxUnavailable: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+{{- end }}
+{{- if .Values.updateStrategy.rollingUpdate.maxSurge }}
+      maxSurge: {{ .Values.updateStrategy.rollingUpdate.maxSurge }}
+{{- end }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+{{- include "eric-odp-cron-operator.labels" . | indent 8 }}
+      annotations:
+        {{- $commonAnn := include "eric-odp-cron-operator.annotations" . | fromYaml -}}
+        {{- include "eric-odp-cron-operator.mergeAnnotations" (dict "location" .Template.Name "sources" (list $commonAnn )) | trim | nindent 8 }}
+    spec:
+    {{- if .Values.podPriority }}
+    {{- if .Values.podPriority.cronoperator.priorityClassName }}
+      priorityClassName: {{ .Values.podPriority.cronoperator.priorityClassName | quote }}
+    {{- end }}
+    {{- end }}
+      serviceAccountName: {{ include "eric-odp-cron-operator.name" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      volumes:
+      {{- if has "stream" (((.Values).global).log).outputs }}
+        {{- include "eric-log-shipper-sidecar.log-shipper-sidecar-volumes" . | indent 8 }}
+      {{- else }}
+        - name: logs-volume
+          emptyDir:
+            sizeLimit: 150Mi
+      {{- end }}
+        - name: config-volume
+          configMap:
+            name: {{ include "eric-odp-cron-operator.name" . }}
+            items:
+              - key: LOG_CTRL_FILE
+                path: logcontrol.json
+        - name: eric-enm-rwxpvc-sched
+          persistentVolumeClaim:
+            claimName: {{ include "eric-odp-cron-operator.name" . }}-sched-pvc
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ template "eric-odp-cron-operator.mainImagePath" . }}
+          imagePullPolicy: {{ template "eric-odp-cron-operator.imagePullPolicy" . }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
+            runAsGroup: 100001
+            capabilities:
+              drop:
+                - all
+          volumeMounts:
+          {{- if has "stream" (((.Values).global).log).outputs }}
+            {{- include "eric-log-shipper-sidecar.log-shipper-sidecar-mounts" . | indent 12 }}
+          {{- else }}
+            - name: logs-volume
+              mountPath: /logs
+          {{- end }}
+            - name: config-volume
+              mountPath: /etc/eolm
+            - name: eric-enm-rwxpvc-sched
+              mountPath: /data
+          env:
+            - name: TimeZone
+              value: {{ (.Values.global).timezone | default "UTC" }}
+            - name: HEALTH_CHECK_PORT
+              value: {{ .Values.container.ports.health | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.container.ports.metrics | quote }}
+            - name: LOG_CTRL_FILE
+              value: "/etc/eolm/logcontrol.json"
+            - name: NAMESPACE
+              value: "{{ .Release.Namespace }}"
+            - name: ROOT_FS_PATH
+              value: "/data/"
+            - name: CRON_WRAPPER_IMAGE
+              value: {{ template "eric-odp-cron-operator.cronWrapperImagePath" . }}
+            - name: IMAGE_PULL_SECRET
+              value: {{ template "eric-odp-cron-operator.pullSecrets" . }}
+            - name: LOG_STREAMING_METHOD
+              value: {{ include "eric-odp-cron-operator.log.streamingMethod" . }}
+            {{- if or (eq (include "eric-odp-cron-operator.log.streamingMethod" .) "dual") (eq (include "eric-odp-cron-operator.log.streamingMethod" .) "direct") }}
+            - name: LOGSTASH_HOST
+              value: "{{ .Values.logging.logstash.host }}"
+            - name: LOGSTASH_SYSLOG_PORT
+              value: "{{ .Values.logging.logstash.syslogPort }}"
+            {{- end }}
+            - name: FAULT_HANDLING_ENABLED
+              value: {{ .Values.env.faultHandling.enabled | quote }}
+            - name: USE_REST_FAULT_INDICATION
+              value: {{ .Values.env.faultHandling.useRESTForFI | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.container.ports.http }}
+              protocol: TCP
+            - name: probe-port
+              containerPort: {{ .Values.container.ports.health }}
+              protocol: TCP
+          {{- if not $g.security.tls.enabled }}
+            - name: http-metrics
+              containerPort: {{ .Values.container.ports.metrics }}
+              protocol: TCP
+          {{- else }}
+            - name: https-metrics
+              containerPort: {{ .Values.container.ports.metrics }}
+              protocol: TCP
+          {{- end }}
+          resources:
+          {{- include "eric-odp-cron-operator.containerResources" (index .Values "resources" "eric-odp-cron-operator") | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.container.ports.health }}
+{{ toYaml (index .Values "probes" "cronoperator" "livenessProbe") | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ .Values.container.ports.health }}
+{{ toYaml (index .Values "probes" "cronoperator" "readinessProbe") | indent 12 }}
+  {{- if has "stream" (((.Values).global).log).outputs }}
+  {{- $logshipperImageDict := dict "logshipperSidecarImage" ((((.Values).global).logShipper).config).image -}}
+  {{- include "eric-log-shipper-sidecar.log-shipper-sidecar-container" (mergeOverwrite . $logshipperImageDict ) | indent 8 }}
+  {{- end }}
+      {{- if include "eric-odp-cron-operator.pullSecrets" . }}
+      imagePullSecrets:
+        - name: {{ template "eric-odp-cron-operator.pullSecrets" . }}
+      {{- end }}
+      {{- if (or .Values.nodeSelector $g.nodeSelector) }}
+      nodeSelector:
+        {{- include "eric-odp-cron-operator.nodeSelector" . | nindent 8 }}
+      {{- end }}
+      topologySpreadConstraints: {{ toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- if eq .Values.affinity.podAntiAffinity "hard" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - {{ include "eric-odp-cron-operator.name" . }}
+              topologyKey: {{ .Values.affinity.topologyKey }}
+      {{- else if eq .Values.affinity.podAntiAffinity  "soft" }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ include "eric-odp-cron-operator.name" . }}
+                topologyKey: "kubernetes.io/hostname"
+      {{- end }}
+      tolerations: {{ include "eric-odp-cron-operator.merge-tolerations" (dict "root" .) | nindent 8 }}

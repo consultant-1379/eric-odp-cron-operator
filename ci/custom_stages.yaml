@@ -1,0 +1,4 @@
+stage-marker-image:
+  - name: cron_wrapper_precodereview.Jenkinsfile
+stage-marker-publish:
+  - name: cron_wrapper_publish.Jenkinsfile

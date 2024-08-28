@@ -1,0 +1,174 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    ericsson.com/product-name: helm-eric-enmsg-amos-odp
+    ericsson.com/product-number: CXC XXXXXXX
+    ericsson.com/product-revision: R1A
+  labels:
+    name: amos
+    app: amos
+  name: {{ .UserName }}
+spec:
+  hostname: {{ .PodName }}
+  restartPolicy: "Never"
+  containers:
+    - command:
+        - /usr/bin/catatonit
+        - --
+        - /stdout-redirect
+        - -redirect
+        - all
+        - -service-id
+        - amos
+        - -logfile
+        - /var/lib/eric-odp-logger/enm-odp.log
+        - -size
+        - "5"
+        - -rotate
+        - "2"
+        - --
+        - "/bin/bash"
+        - /ericsson/pod_setup/sshd/scripting/start_sshd.sh 
+      env:
+        - name: TZ
+          value: Europe/Dublin
+        - name: JBOSS_HOST
+          value: amos
+        - name: sessiontoken
+          valueFrom:
+            secretKeyRef:
+              name: {{ .TokenSecret }}
+              key: tokentype
+        - name: sessionusername
+          value: {{ .UserName }}
+        - name: USER
+          value: {{ .UserName }}
+        - name: HOME
+          value: /home/shared/{{ .UserName }}
+        - name: LOGNAME
+          value: {{ .UserName }}
+        - name: PWD
+          value: /home/shared/{{ .UserName }}
+      image: armdocker.rnd.ericsson.se/proj_oss_releases/enm/eric-enmsg-amos-odp:1.0.0-19
+
+      imagePullPolicy: IfNotPresent
+      name: amos
+      volumeMounts:
+        - name: home
+          mountPath: /home/shared/{{ .UserName }}
+          subPath: {{ .UserName }}
+        - name: amos
+          mountPath: /ericsson/log/amos/moshell_logfiles/{{ .UserName }}
+          subPath: {{ .UserName }}
+        - name: data
+          mountPath: /ericsson/tor/data
+        - name: var-lib-eric-odp
+          mountPath: /var/lib/eric-odp
+        - name: logs
+          mountPath: /var/lib/eric-odp-logger/
+        - name: var-opt-ericsson-amos
+          mountPath: /var/opt/ericsson/amos
+        - name: enm-global-moshellrc
+          mountPath: /home/shared/common/moshell
+
+      securityContext:
+        runAsUser: {{index .LdapUserAttr "uidNumber"}}
+
+        runAsGroup: 5004
+        allowPrivilegeEscalation: false
+        capabilities:
+
+         drop: [ "SETGID", "SETUID","KILL","MKNOD" ]
+        seccompProfile:
+
+         type: RuntimeDefault
+  initContainers:
+  - name: odp-init
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "/usr/local/bin/setup_for_main_container.sh" ]
+    env:
+      - name: TZ
+        value: Europe/Dublin
+      - name: INIT_GROUPS
+        value: {{ .LdapGroups }}
+      - name: MAIN_APPLICATION_USER_NAME
+        value: {{ .UserName }}
+      - name: MAIN_APPLICATION_USER_UID
+        value: '{{index .LdapUserAttr "uidNumber"}}'
+      - name: MAIN_APPLICATION_USER_PRIMARY_GID
+        value: '{{index .LdapUserAttr "gidNumber"}}'
+      - name: SSO_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: {{ .TokenSecret }}
+            key: tokentype
+      - name: SSO_USERNAME
+        value: {{ .UserName }}
+      - name: USER
+        value: {{ .UserName }}
+      - name: HOME
+        value: /home/shared/{{ .UserName }}
+      - name: LOGNAME
+        value: {{ .UserName }}
+      - name: PWD
+        value: /home/shared/{{ .UserName }}
+
+    imagePullPolicy: IfNotPresent
+    image: armdocker.rnd.ericsson.se/proj_oss_releases/enm/eric-odp-init:1.0.0-19
+
+    resources: { }
+    securityContext:
+      runAsUser: {{index .LdapUserAttr "uidNumber"}}
+      runAsGroup: 5004
+      allowPrivilegeEscalation: false
+
+      capabilities:
+        drop: [ "SETGID", "SETUID","KILL","MKNOD" ]
+      seccompProfile:
+        type: RuntimeDefault
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+     - name: var-lib-eric-odp
+       mountPath: /var/lib/eric-odp
+     - name: home
+       mountPath: /home/shared
+  volumes:
+  - name: home
+    persistentVolumeClaim:
+     claimName: eric-enm-rwxpvc-home-shared
+  - name: amos
+    persistentVolumeClaim:
+     claimName: eric-enm-rwxpvc-amos
+  - name: data
+    persistentVolumeClaim:
+     claimName: eric-enm-rwxpvc-data
+  - emptyDir:
+      sizeLimit: 5Mi
+    name: var-lib-eric-odp
+  - emptyDir:
+      sizeLimit: 35Mi
+    name: logs
+  - emptyDir:
+     sizeLimit: 10Mi
+    name: var-opt-ericsson-amos
+  - configMap:
+      name: enm-global-moshellrc
+    name: enm-global-moshellrc
+  - configMap:
+      defaultMode: 420
+      items:
+        - key: filters.conf
+          path: filters.conf
+        - key: fluent-bit.conf
+          path: fluent-bit.conf
+        - key: inputs.conf
+          path: inputs.conf
+        - key: outputs.conf
+          path: outputs.conf
+        - key: parsers.conf
+          path: parsers.conf
+      name: amos-odp-logshipper-cfg
+      optional: false
+    name: fluentbit-config

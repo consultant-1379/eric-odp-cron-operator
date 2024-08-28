@@ -1,0 +1,38 @@
+{{- if .Values.ingress.enabled -}}
+{{- $serviceName := include "eric-oss-go-template-microservice.name" . -}}
+{{- $servicePort := .Values.service.port -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ template "eric-oss-go-template-microservice.name" . }}-http
+  labels:
+{{- include "eric-oss-go-template-microservice.labels" . | indent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+{{- if (semverCompare "<1.18" .Capabilities.KubeVersion.GitVersion) }}
+{{- if .Values.ingress.ingressClass }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.ingressClass | quote }}
+{{- end }}
+{{- end }}
+{{- with .Values.ingress.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+{{- include "eric-oss-go-template-microservice.annotations" . | indent 4 }}
+spec:
+  {{- if (semverCompare ">=1.18" .Capabilities.KubeVersion.GitVersion) }}
+  {{- if .Values.ingress.ingressClass }}
+  ingressClassName: {{ .Values.ingress.ingressClass | quote }}
+  {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end -}}

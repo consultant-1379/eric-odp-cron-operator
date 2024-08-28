@@ -1,0 +1,290 @@
+#
+# COPYRIGHT Ericsson 2023
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+modelVersion: 2.0
+
+# Bob reference: https://gerrit.ericsson.se/plugins/gitiles/adp-cicd/bob/+/HEAD/USER_GUIDE_2.0.md
+description: "Bob ruleset for Go microservice CI pipelines"
+
+# ADP docker image catalog: https://eteamspace.internal.ericsson.com/x/zUqhQw
+docker-images:
+  # Builder images
+  - adp-release-auto: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-adp-release-auto:${env.RELEASE_AUTO_TAG}
+  - adp-helm-kubectl: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-py3kubehelmbuilder:${env.HELM_KUBECTL_TAG}
+  - adp-helm-dr-check: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/common-library-adp-helm-dr-check:${env.HELM_DR_CHECK_TAG}
+  - adp-image-dr-check: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/adp-image-dr-check:${env.IMAGE_DR_CHECK_TAG}
+  - adp-doc-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-docbuilder:${env.DOC_BUILDER_TAG}
+  - adp-asciidoc-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-asciidocbuilder:${env.ASCII_DOC_BUILDER_TAG}
+  - adp-sonar-scanner: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-sonarscannerbuilder:${env.SONAR_SCANNER_TAG}
+  - go-builder: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-gobuilder.adp-base-os:${env.GO_BUILDER_TAG}
+
+  # VA scan tools
+  - hadolint-scan: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/hadolint-scan:${env.HADOLINT_TAG}
+  - kubesec-scan: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-scan-kubesec:${env.KUBESEC_TAG}
+  - kubeaudit-scan: armdocker.rnd.ericsson.se/proj-adp-cicd-drop/va-scan-kubeaudit:${env.KUBEAUDIT_TAG}
+
+import:
+  common: ../common-properties.yaml
+
+  # DR exemptions
+  # User guide: https://eteamspace.internal.ericsson.com/x/5R9ke
+  # ODP approved helm design rule exemptions: https://gerrit.ericsson.se/plugins/gitiles/OSS/com.ericsson.oss.ci/oss-common-ci-utils/+/refs/heads/dVersion-2.0.0-hybrid/dsl/helm-dr-properties.yaml
+  helm: helm-dr-properties.yaml
+
+properties:
+  # Docker
+  - image-secret: armdocker
+  - image-registry: armdocker.rnd.ericsson.se
+  - image-repopath-dev: ${image-registry}/proj-eric-odp/proj-eric-odp-dev
+  - image-repopath-internal: ${image-registry}/proj-eric-odp/proj-eric-odp-ci-internal
+  - image-repopath-drop: ${image-registry}/proj-eric-odp/proj-eric-odp-drop
+  - cron-wrapper-image-full-name-dev: ${image-repopath-dev}/${common.cronwrapper-docker-image-name}
+  - cron-wrapper-image-full-name-internal: ${image-repopath-internal}/${common.cronwrapper-docker-image-name}
+  - cron-wrapper-image-full-name-drop: ${image-repopath-drop}/${common.cronwrapper-docker-image-name}
+
+  # Helm
+  - helm-repo-server: https://arm.seli.gic.ericsson.se/artifactory
+  - helm-repopath-dev: ${helm-repo-server}/proj-eric-odp-dev-helm-local
+  - helm-repopath-internal: ${helm-repo-server}/proj-eric-odp-ci-internal-helm-local
+  - helm-repopath-drop: ${helm-repo-server}/proj-eric-odp-drop-helm-local
+  - helm-logs-output-dir: build/helm-install-logs
+
+  # DR properties
+  - enabled-helm-design-rules: ${common.enabled-helm-design-rules}
+  - exempt-helm-design-rules: ${helm.exempt-helm-design-rules}
+  - image-dr-check-output-dir: build/image-dr-check
+  - helm-dr-check-output-dir: build/helm-dr-check
+
+  # VA configs
+  - va-config-dir: config
+  - va-hadolint-config: ${va-config-dir}/hadolint_config.yaml
+  - va-report-config: ${va-config-dir}/va_report.config
+  - va-readable-report-config: ${va-config-dir}/va_readable_report_config.yaml
+
+  # VA reports
+  - va-report-dir: build/va-reports
+  - va-report-name: vulnerability_report_2.0.md
+  - va-hadolint-report-dir: ${va-report-dir}/hadolint-reports
+  - va-kubesec-report-dir: ${va-report-dir}/kubesec-reports
+  - va-kubeaudit-report-dir: ${va-report-dir}/kubeaudit-reports
+  - va-readable-report-dir: ${va-report-dir}/readable-va-report
+
+  # FOSSA
+  - fossa-config-dir: config
+  - fossa-output-dir: build/fossa
+  - fossa-team-name: ${common.fossa-team-name}
+  - fossa-project-name: ${common.helm-chart-name}
+  - fossa-report-name: fossa-report.json
+  - fossa-dependencies-file: dependencies-3pp.yaml
+  - fossa-dependencies-metadata-file: dependencies-metadata.yaml
+  - fossa-server-endpoint: https://scasfossa.internal.ericsson.com/
+
+  # Eridoc
+  - eridoc-config-dir: config
+  - eridoc-output-dir: build/eridoc
+  - eridoc-config: ${eridoc-config-dir}/eridoc_config.yaml
+  - eridoc-stylesheet: ${eridoc-config-dir}/eridoc_stylesheet.css
+  - eridoc-doc-to-pdf-config: ${eridoc-config-dir}/eridoc_docs_to_pdf_config.yaml
+
+  # Gerrit
+  - gerrit-repo-name: ${common.gerrit-repo-name}
+  - gerrit-repo-url: ${GERRIT_CENTRAL_HTTP}/${gerrit-repo-name}.git
+
+  # Go
+  - go-src: ${common.go-src}
+  - go-ldflags: ${common.go-ldflags}
+  - go-lint-config: ${common.go-lint-config}
+  - go-lint-output-dir: build/go-lint
+  - go-docker-params: ${common.go-docker-params}
+  - go-binary-output: build/go-binary/${common.helm-chart-name}
+
+env:
+  - PWD
+  - HOME
+  - RELEASE (default=false)
+  - BUILD_DIR (default=./build)
+  - ARM_TOKEN
+  - ARM_USER
+
+  # Docker
+  - SELI_ARTIFACTORY_REPO_USER
+  - SELI_ARTIFACTORY_REPO_PASS
+  - SERO_ARTIFACTORY_REPO_USER
+  - SERO_ARTIFACTORY_REPO_PASS
+  - DOCKER_VOLUME_MAPPING_PASSWD (default=--volume ${env.HOME}/mypasswd:/etc/passwd:ro)
+
+  # Helm
+  - KUBECONFIG
+  - K8S_NAMESPACE (default=${common.helm-chart-name}-${var.commithash})
+  - ENABLE_HELM_V3 (default=true)
+  - HELM_INSTALL_TIMEOUT (default=5m0s)
+  - HELM_RELEASE (default=${common.helm-chart-name}-release)
+  - KAAS_INFO_FILE (default=${helm-logs-output-dir}/kaas-info.log)
+  - COLLECT_LOGS_DIR (default=${helm-logs-output-dir}/k8s-logs)
+  - COLLECT_LOGS_SINCE_RELATIVE_TIME (default="2h")
+  - COLLECT_LOGS_SCRIPT_FILE_NAME (default="collect_ADP_logs.sh")
+  - COLLECT_LOGS_SCRIPT_LOCATION (default="https://arm.sero.gic.ericsson.se/artifactory/proj-ADP_GS_Support_FTP-generic-local/collect_ADP_logs")
+
+  # SonarQube
+  - SONAR_AUTH_TOKEN
+  - SONAR_HOST_URL
+  - SONAR_BRANCH (default="master")
+
+  # FOSSA
+  - SCAS_TOKEN
+  - FOSSA_API_KEY
+
+  # Eridoc
+  - ERIDOC_USERNAME
+  - ERIDOC_PASSWORD
+
+  # Vulnerability analysis
+  - VHUB_API_TOKEN
+  - HADOLINT_ENABLED
+  - KUBESEC_ENABLED
+  - KUBEAUDIT_ENABLED
+
+  # Docker image versions
+  - RELEASE_AUTO_TAG (default=latest)
+  - HELM_KUBECTL_TAG (default=latest)
+  - HELM_DR_CHECK_TAG (default=latest)
+  - IMAGE_DR_CHECK_TAG (default=latest)
+  - DOC_BUILDER_TAG (default=2.3.0-latest)
+  - ASCII_DOC_BUILDER_TAG (default=latest)
+  - SONAR_SCANNER_TAG (default=latest)
+  - GO_BUILDER_TAG (default=${common.go-builder-version})
+  - HADOLINT_TAG (default=latest)
+  - KUBESEC_TAG (default=latest)
+  - KUBEAUDIT_TAG (default=latest)
+
+  # Gerrit
+  - GERRIT_USERNAME
+  - GERRIT_PASSWORD
+  - GERRIT_CHANGE_URL (default= )
+  - GERRIT_CHANGE_NUMBER (default=$GERRIT_CHANGE_NUMBER)
+
+var:
+  # Docker
+  - image-registry
+  - image-repopath-internal
+  - image-repopath-drop
+  - cron-wrapper-image-full-name-drop
+  - image-dr-vm-args
+  - docker-config-basepath
+
+  # Helm
+  - helm-repopath-internal
+  - helm-repopath-drop
+  - save-namespace
+  - kaas-version
+  - kaas-current-context
+
+  # Gerrit
+  - version
+  - rstate
+  - revision
+  - commithash
+  - commithash-full
+  - commit-author
+  - commit-email
+  - rest2html-optional
+
+  # Vulnerability analysis
+  - va-report-args
+  - hadolint-result-code
+
+rules:
+  # Integrated rules for the local environment
+  local:
+    - rule: clean
+    - rule: init-dev
+    - rule: lint
+    - rule: build
+    - rule: test
+    - rule: image
+    - rule: image-dr-check
+    - rule: package
+    - rule: install-test
+
+  # Build
+  build:
+    - task: build
+      description: build go source code and create binary
+      docker-image: go-builder
+      docker-flags:
+        - ${go-docker-params}
+      cmd:
+        - go version
+        - go build -o ${env.PWD}/${go-binary-output} ${env.PWD}/${go-src}
+    - task: verify-go-binary
+      cmd: sh -c '
+        if [ ! -f ${env.PWD}/${go-binary-output}]; then
+        echo "Error in go build command"; exit 1; fi;'
+
+  # Image
+  image:
+    - task: docker-build
+      cmd: docker build ${env.PWD}
+        --file ${common.cronwrapper-dockerfile}
+        --tag ${cron-wrapper-image-full-name-internal}:${var.version}
+        --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+        --build-arg COMMIT=${var.commithash}
+        --build-arg APP_VERSION=${var.version}
+        --build-arg RSTATE=${var.rstate}
+        --build-arg IMAGE_PRODUCT_NUMBER=${common.image-product-number}
+        --build-arg CBOS_IMAGE_TAG=${common.cbos-image-version}
+        --build-arg CBOS_IMAGE_REPO=${common.cbos-image-repo}
+        --build-arg CBOS_IMAGE_NAME=${common.cbos-image-name}
+        --label com.ericsson.product-number="${common.image-product-number}"
+        --label com.ericsson.product-revision=${var.rstate}
+        --label org.opencontainers.image.title="${common.cronwrapper-docker-image-name}"
+        --label org.opencontainers.image.created=`date -u +%FT%TZ`
+        --label org.opencontainers.image.revision=${var.commithash}
+        --label org.opencontainers.image.vendor="Ericsson"
+        --label org.opencontainers.image.version=${var.version}
+
+  # Image DR check
+  image-dr-check:
+    - task: image-dr-check
+      docker-image: adp-image-dr-check
+      docker-in-docker: socket
+      cmd: "image-dr-check
+        --image ${cron-wrapper-image-full-name-internal}:${var.version}
+        --output ${image-dr-check-output-dir}
+        ${var.image-dr-vm-args}"
+
+  # Package
+  package:
+    - task: upload-docker-image
+      cmd: docker push ${cron-wrapper-image-full-name-internal}:${var.version}
+
+  # Cleanup images
+  # Delete docker images from the local / jenkins agent.
+  delete-images:
+    - task: delete-internal-image
+      cmd: docker image remove -f ${cron-wrapper-image-full-name-internal}:${var.version} $(docker images -f "dangling=true" -q) || true
+    - task: delete-drop-image
+      cmd: docker image remove -f ${cron-wrapper-image-full-name-drop}:${var.version} $(docker images -f "dangling=true" -q) || true
+
+  # Publish
+  # Publish docker images to drop artifactory repository
+  publish:
+    - task: image-pull-internal
+      cmd: docker pull ${cron-wrapper-image-full-name-internal}:${var.version}
+    - task: image-tag-public
+      cmd: docker tag ${cron-wrapper-image-full-name-internal}:${var.version} ${cron-wrapper-image-full-name-drop}:${var.version}
+    - task: image-push-public
+      cmd: docker push ${cron-wrapper-image-full-name-drop}:${var.version}

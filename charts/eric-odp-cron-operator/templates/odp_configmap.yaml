@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ include "eric-odp-cron-operator.name" . }}-cfg"
+  labels:
+    {{- include "eric-odp-cron-operator.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-odp-cron-operator.annotations" . | nindent 4 }}
+data:
+  defaultLimitCpu: 200m
+  defaultLimitMemory: 125Mi
+  defaultRequestsCpu: 100m
+  defaultRequestsMemory: 75Mi
+  largeLimitCpu: 400m
+  largeLimitMemory: 200Mi
+  largeRequestsCpu: 300m
+  largeRequestsMemory: 100Mi
+{{- if .Files.Glob "appconfig/odp-templates/cron-odp-template.yaml" }}
+  template: |
+{{ tpl (.Files.Get "appconfig/odp-templates/cron-odp-template.yaml") . | indent 4 }}
+{{- end }}

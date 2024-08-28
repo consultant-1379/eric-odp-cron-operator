@@ -1,0 +1,9 @@
+resources:
+- manager.yaml
+  #- pvc.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: controller
+  newName: armdocker.rnd.ericsson.se/proj_oss_releases/enm/controller
+  newTag: latest

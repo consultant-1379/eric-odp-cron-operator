@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "eric-odp-cron-operator.name" . }}-sched-pvc
+  labels:
+{{- include "eric-odp-cron-operator.labels" . | indent 4 }}
+  annotations:
+{{- include "eric-odp-cron-operator.annotations" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistentVolumeClaim.accessMode }}
+{{- if .Values.persistentVolumeClaim.storageClass }}
+ {{- if (eq "-" .Values.persistentVolumeClaim.storageClass) }}
+  storageClassName: ""
+ {{- else }}
+  storageClassName: {{ .Values.persistentVolumeClaim.storageClass | quote }}
+ {{- end }}
+{{- end }}
+  resources:
+    requests:
+      storage: {{ default .Values.persistentVolumeClaim.size "1Gi" | quote }}

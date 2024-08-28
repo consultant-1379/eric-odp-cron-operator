@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "eric-odp-cron-operator.name" . }}-api
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "eric-odp-cron-operator.labels" . | nindent 4 }}
+  annotations: {{- include "eric-odp-cron-operator.annotations" . | nindent 4 }}
+rules:
+- apiGroups: ["batch"]
+  resources: ["cronjobs","jobs"]
+  verbs: ["*"]

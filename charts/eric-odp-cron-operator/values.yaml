@@ -1,0 +1,153 @@
+replicaCount: 1
+
+annotations:
+  persistentVolume: ""
+  com.ericsson.odp.application: "cron"
+  com.ericsson.odp.accessgroups: "scripting_ssh, scripting_ssh_m2m"
+
+labels:
+  com.ericsson.odp.template: "true"
+
+persistentVolumeClaim:
+  name: cron-operator-sched-pvc
+  accessMode: ReadWriteMany
+  mountPath: /data
+  size: 1Gi
+  storageClass: network-file
+
+image:
+  repository: ""
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imageCredentials:
+  repoPath: # see default value in eric-product-info.yaml file
+  pullSecret:
+  logshipper:
+    registry:
+      url:
+      imagePullPolicy:
+    repoPath: "proj-adp-log-released"
+
+updateStrategy:
+  # type can be OnDelete or RollingUpdate
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+service:
+  type: ClusterIP
+  port: 8888
+  metrics:
+    port: 8080
+  health:
+    port: 8081
+
+container:
+  ports:
+    http: 8888
+    metrics: 8080
+    health: 8081
+
+ingress:
+  enabled: false
+  ingressClass: ""
+  annotations: { }
+  hostname: ""
+
+resources:
+  eric-odp-cron-operator:
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+      ephemeral-storage: "128Mi"
+    requests:
+      cpu: "10m"
+      memory: "8Mi"
+      ephemeral-storage: "8Mi"
+  logshipper:
+    limits:
+      memory: "100Mi"
+      cpu: "50m"
+    requests:
+      memory: "50Mi"
+      cpu: "20m"
+
+affinity:
+  podAntiAffinity: "soft"
+
+# Custom labels
+labels: { }
+
+terminationGracePeriodSeconds: 30
+
+tolerations: [ ]
+
+env:
+  faultHandling:
+    enabled: true
+    # Setting to set if REST interface is used for sending FaultIndications to Alarm Handler
+    useRESTForFI: true
+
+probes:
+  cronoperator:
+    livenessProbe:
+      initialDelaySeconds: 1
+      periodSeconds: 10
+      timeoutSeconds: 10
+      failureThreshold: 3
+    readinessProbe:
+      initialDelaySeconds: 1
+      periodSeconds: 10
+      timeoutSeconds: 10
+      successThreshold: 3
+      failureThreshold: 3
+
+podPriority:
+  cronoperator:
+    priorityClassName: ""
+
+prometheus:
+  path: /metrics
+  role: service
+  interval: 15s
+
+topologySpreadConstraints: [ ]
+
+# DR D1123-127
+appArmorProfile:
+  # The setting applies to all container when the container name is omitted.
+  # { choice='unconfined, runtime/default, localhost, "" ' } [ default="" ]
+  type: ""
+  logshipper:
+    type: ""
+
+# DR D1123-128
+seccompProfile:
+  # The setting applies to all container when the container name is omitted.
+  # { choice='unconfined, runtime/default, localhost, "" ' } [ default="" ]
+  type: ""
+
+logging:
+  logstash:
+    host: eric-log-transformer
+    syslogPort: 5014
+
+# Configuration for LogShipper sidecar.
+logShipper:
+  logLevel: info
+  runAndExit: false
+  shutdownDelay: 10
+  input:
+    files:
+      - enabled: true
+        paths:
+          - "cronoperator.log*"
+  storage:
+    path: "/logs"
+    size: "150Mi"
+  output:
+    logTransformer:
+      host: eric-log-transformer

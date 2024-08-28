@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    meta.helm.sh/release-namespace: enm6
+  labels:
+    app.kubernetes.io/instance: eric-enm-pre-deploy-integration-enm6
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: rwxpvc
+    app.kubernetes.io/version: eric-enm-rwxpvc-1.6.0-28
+  name: eric-enm-rwxpvc-sched
+  namespace: project-system
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs-enm6
+  volumeMode: Filesystem

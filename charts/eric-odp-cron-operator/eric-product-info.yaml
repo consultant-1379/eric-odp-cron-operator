@@ -1,0 +1,17 @@
+productName: "On Demand Cron Operator HELM"
+productNumber: "CXC 101 1001"
+images:
+  ericodpcronoperator:
+    productName: "ODP Cron Operator Image"
+    productNumber: "SOME_NUMBER"
+    registry: "armdocker.rnd.ericsson.se"
+    repoPath: "REPO_PATH"
+    name: "IMAGE_NAME"
+    tag: "VERSION"
+  ericodpcronwrapper:
+    productName: "ODP Cron Wrapper Image"
+    productNumber: "SOME_NUMBER"
+    registry: "armdocker.rnd.ericsson.se"
+    repoPath: "REPO_PATH"
+    name: "eric-odp-cron-wrapper"
+    tag: "VERSION"

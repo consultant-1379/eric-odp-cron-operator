@@ -1,0 +1,35 @@
+ARG CBOS_IMAGE_NAME
+ARG CBOS_IMAGE_REPO
+ARG CBOS_IMAGE_TAG
+
+# Stage 1: Generate the openapi client for the ODP Factory yaml file
+FROM openapitools/openapi-generator-cli AS generator
+COPY src/ src/
+COPY api/ api/
+
+RUN bash /usr/local/bin/docker-entrypoint.sh generate \
+    -i api/client/odp-factory.yaml \
+    -g go \
+    -o src/odpfactory/ \
+    --package-name odpfactory
+
+# Stage 2: Compile the GO Code
+FROM armdocker.rnd.ericsson.se/proj-adp-cicd-drop/bob-gobuilder.adp-base-os:latest as builder
+COPY src/ /src/
+COPY --from=generator /src/odpfactory /src/odpfactory
+WORKDIR /src/cronwrapper/cmd/eric-odp-cronwrapper/
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on GOFLAGS=-buildvcs=false go build -a -o cronwrapper
+
+# Stage 3: Build the Image
+FROM ${CBOS_IMAGE_REPO}/${CBOS_IMAGE_NAME}:${CBOS_IMAGE_TAG}
+
+WORKDIR /
+COPY --from=builder /src/cronwrapper/cmd/eric-odp-cronwrapper/cronwrapper /
+
+ARG ERIC_ODP_CRON_WRAPPER_UID=180163
+ARG ERIC_ODP_CRON_WRAPPER_GID=180163
+USER $ERIC_ODP_CRON_WRAPPER_UID:$ERIC_ODP_CRON_WRAPPER_GID
+EXPOSE 8080
+
+ENTRYPOINT ["/cronwrapper"]

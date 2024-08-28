@@ -1,0 +1,40 @@
+{{- $g := fromJson (include "eric-odp-cron-operator.global" .) -}}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "eric-odp-cron-operator.name" . }}
+  labels: {{- include "eric-odp-cron-operator.labels" . | indent 4 }}
+  annotations:
+{{- include "eric-odp-cron-operator.annotations-with-prometheus" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.container.ports.http }}
+      protocol: TCP
+  {{- if not $g.security.tls.enabled }}
+    - name: http-metrics
+      port: {{ .Values.service.metrics.port }}
+      targetPort: {{ .Values.container.ports.metrics }}
+      protocol: TCP
+  {{- else }}
+    - name: https-metrics
+      port: {{ .Values.service.metrics.port }}
+      targetPort: {{ .Values.container.ports.metrics }}
+      protocol: TCP
+  {{- end }}
+    - name: health
+      port: {{ .Values.service.health.port }}
+      targetPort: {{ .Values.container.ports.health }}
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ template "eric-odp-cron-operator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+  ipFamilyPolicy: PreferDualStack
+  {{- if (eq (include "eric-odp-cron-operator.internalIPFamily" .) "IPv4") }}
+  ipFamilies: ["IPv4"]
+  {{- else if (eq (include "eric-odp-cron-operator.internalIPFamily" .) "IPv6") }}
+  ipFamilies: ["IPv6"]
+  {{- end }}

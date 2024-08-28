@@ -1,0 +1,46 @@
+apiVersion: v1
+data:
+  defaultLimitCpu: 200m
+  defaultLimitMemory: 125Mi
+  defaultRequestsCpu: 100m
+  defaultRequestsMemory: 75Mi
+  largeLimitCpu: 400m
+  largeLimitMemory: 200Mi
+  largeRequestsCpu: 300m
+  largeRequestsMemory: 100Mi
+  otherName: otherValue
+  template: "apiVersion: v1\nkind: Pod\nmetadata:\n  name: odp-template-testapp\nspec:\n
+    \ restartPolicy: Never\n  containers:      \n  - name: testcon\n    image: registry.access.redhat.com/ubi8/ubi:8.9\n
+    \   command: [\"sleep\",  \"30\" ]\n    resources:\n    {{- if eq (index .LdapUserAttr
+    \"description\") \"large\" }}\n      limits:\n        cpu: \"{{index .ConfigData
+    \"largeLimitCpu\"}}\"\n        memory: \"{{index .ConfigData \"largeLimitMemory\"}}\"\n
+    \     requests:\n        cpu: \"{{index .ConfigData \"largeRequestsCpu\"}}\"\n
+    \       memory: \"{{index .ConfigData \"largeRequestsMemory\"}}\"\n    {{- else
+    }}\n      limits:\n        cpu: \"{{index .ConfigData \"defaultLimitCpu\"}}\"\n
+    \       memory: \"{{index .ConfigData \"defaultLimitMemory\"}}\"\n      requests:\n
+    \       cpu: \"{{index .ConfigData \"defaultRequestsCpu\"}}\"\n        memory:
+    \"{{index .ConfigData \"defaultRequestsMemory\"}}\"\n    {{- end }}\n    env:\n
+    \    - name: OTHER_NAME\n       value: \"{{index .ConfigData \"otherName\"}}\"\n
+    \    - name: UID\n       value: \"{{index .LdapUserAttr \"uidNumber\"}}\"\n     -
+    name: TOKEN\n       value: \"{{index .RequestData \"token\"}}\"\n     - name:
+    LDAP_GROUP_NAMES\n       value: \"{{ .LdapGroups }}\"\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    com.ericsson.odp.application: testapp2
+    com.ericsson.odp.application.profiles: default,large
+  creationTimestamp: "2024-03-20T16:48:41Z"
+  labels:
+    com.ericsson.odp.template: "true"
+  name: odp-template-testapp2
+  namespace: enm17c10
+  resourceVersion: "21454776"
+  uid: 4e7dc56a-3fb6-4534-8c8c-0a6aaebf9813
+
+
+
+
+
+
+
+  

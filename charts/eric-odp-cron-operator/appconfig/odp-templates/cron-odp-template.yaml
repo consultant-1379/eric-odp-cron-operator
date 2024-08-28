@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: eric-odp-cron-operator-template
+spec:
+  restartPolicy: "Never"
+  containers:
+    - name: cron
+      image: registry.access.redhat.com/ubi8/ubi:8.9
+      command:
+        - "/bin/bash"
+        - "-c"
+        - "{{ index `{{ .RequestData "command" }}` }}"
+      resources:
+      {{- if eq (index `{{ .LdapUserAttr "description" }}`) "large" }}
+        limits:
+          cpu: "{{ index `{{  .ConfigData "largeLimitCpu" }}` }}"
+          memory: "{{ index `{{ .ConfigData "largeLimitMemory" }}` }}"
+        requests:
+          cpu: "{{ index `{{  .ConfigData "largeRequestsCpu" }}` }}"
+          memory: "{{ index `{{  .ConfigData "largeRequestsMemory" }}` }}"
+      {{- else}}
+        limits:
+          cpu: "{{ index `{{ .ConfigData "defaultLimitCpu" }}` }}"
+          memory: "{{ index `{{ .ConfigData "defaultLimitMemory" }}` }}"
+        requests:
+          cpu: "{{ index `{{ .ConfigData "defaultRequestsCpu" }}` }}"
+          memory: "{{ index `{{ .ConfigData "defaultRequestsMemory" }}` }}"
+      {{- end}}
+      env:
+        - name: UID
+          value: "{{ index `{{ .LdapUserAttr "uidNumber" }}` }}"
+        - name: TOKEN
+          value: "{{ index `{{ .RequestData "token" }}` }}"
+        - name: LDAP_GROUP_NAMES
+          value: "{{ .LdapGroups }}"

@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "eric-odp-cron-operator.name" . }}-api
+  labels: {{- include "eric-odp-cron-operator.labels" . | nindent 4 }}
+  annotations: {{- include "eric-odp-cron-operator.annotations" . | nindent 4 }}
+roleRef:
+  kind: Role
+  name: {{ include "eric-odp-cron-operator.name" . }}-api
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: {{ template "eric-odp-cron-operator.name" . }}

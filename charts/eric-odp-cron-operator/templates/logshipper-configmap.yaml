@@ -1,0 +1,3 @@
+{{- if has "stream" (((.Values).global).log).outputs }}
+  {{- include "eric-log-shipper-sidecar.logshipper-sidecar-configmap" . }}
+{{- end }}
